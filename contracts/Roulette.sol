@@ -29,20 +29,21 @@ contract Roulette {
 
     struct Round {
         Color winColor;
-        uint256 pool;
         uint256 timestamp;
-        // address[] green;
-        // address[] black;
-        // address[] red;
+
+		uint256 blackPool;
+		uint256 redPool;
+		uint256 greenPool;
     }
 
     uint8[] redNumbers = [1,3,5,7,9,12,14,16,18,21,23,25,27,28,30,32,34,36];
 
     mapping(uint256 => Round) public rounds;
+	mapping(uint256 => mapping(address => uint256)) bets;
 
     event CreateRoulette(uint256 round);
     event EnterRoulette(address indexed player, uint256 bet, Color color);
-    event CloseRoulette(uint256 round, uint256 pool, Color winColor);
+    event CloseRoulette(uint256 round, uint256 totalPool, Color winColor);
 
 	constructor(uint256 _ownerFee, address _numberGenerator) {
 		Generator = NumberGenerator(_numberGenerator);
@@ -53,7 +54,7 @@ contract Roulette {
 
     function createRound() onlyOwner external {
 		Round memory currentRound = rounds[roundId];
-        require(currentRound.winColor == Color(0) && currentRound.pool == 0, "Current round is not closed");
+        require(currentRound.winColor == Color(0) && currentRound.timestamp == 0, "Current round is not closed");
 
         rounds[roundId].timestamp = block.timestamp;
 
@@ -65,7 +66,14 @@ contract Roulette {
 		require(msg.value >= minBet, "Your bet is too low");
         require(msg.value <= maxBet, "Your bet is too high");
 
-        rounds[roundId].pool += msg.value;
+		bets[roundId][msg.sender] += msg.value;
+
+		if(_color == Color(1))
+			rounds[roundId].blackPool += msg.value;
+		else if(_color == Color(2))
+			rounds[roundId].redPool += msg.value;
+		else 
+			rounds[roundId].greenPool += msg.value;
 
         emit EnterRoulette(msg.sender, msg.value, _color);
     }
@@ -83,10 +91,16 @@ contract Roulette {
 
         Color winningColor = _convertNumberToColor(number);
 
-        _payToWinner(winningColor == Color(1) ? _green :
-		winningColor == Color(2) ? _red : _black, rounds[roundId].pool);
+		(uint256 blackPool, uint256 redPool, uint256 greenPool) = getPools(roundId);
+		uint256 totalPool = blackPool + redPool + greenPool;
 
-        emit CloseRoulette(roundId, rounds[roundId].pool, winningColor);
+		uint256 winnerPool = winningColor == Color(1) ? blackPool : 
+		winningColor == Color(2) ? redPool : greenPool;
+
+        _payToWinner(winningColor == Color(1) ? _black : 
+		winningColor == Color(2) ? _red : _green, winnerPool, totalPool - winnerPool);
+
+        emit CloseRoulette(roundId, totalPool, winningColor);
 
         unchecked {
             roundId++;
@@ -111,13 +125,19 @@ contract Roulette {
         return winningColor;
     }
 
-	function _payToWinner(address[] calldata _winners, uint256 _prize) internal {
-		uint256 perAddress = _prize / _winners.length;
+	function _payToWinner(address[] calldata _winners, uint256 _winnerPool, uint256 _prizePool) internal {
+        for(uint256 i = 0; i < _winners.length; i++) {
+			address winner = _winners[i];
 
-		if(_winners.length > 0)
-            for(uint256 i = 0; i < _winners.length; i++) {
-                payable(_winners[i]).sendValue(perAddress);
-            }
+			uint256 userBet = bets[roundId][winner];
+
+            payable(winner).sendValue(_prizePool * userBet / _winnerPool);
+        }
+	}
+
+	function getPools(uint256 _roundId) public view returns(uint256, uint256, uint256) {
+		Round memory round = rounds[_roundId];
+		return (round.blackPool, round.redPool, round.greenPool);
 	}
 
 	function setOwnerFee(uint256 _newOwnerFee) onlyOwner public {
