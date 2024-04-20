@@ -1,13 +1,18 @@
-# Sample Hardhat Project
+# Number Generator
 
-This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, and a Hardhat Ignition module that deploys that contract.
+While deploying this contract, you need to pass 3 arguments.
 
-Try running some of the following tasks:
-
-```shell
-npx hardhat help
-npx hardhat test
-REPORT_GAS=true npx hardhat test
-npx hardhat node
-npx hardhat ignition deploy ./ignition/modules/Lock.ts
+```solidity
+address coordinator;
+uint64 subscriptionId;
+bytes32 keyHash;
 ```
+
+All these variables can be found on [VRF Subscription Manager](https://vrf.chain.link).
+As for
+
+```solidity
+uint64 subscriptionId;
+```
+
+you will need to Create an subscription and fund it with LINK tokens.
