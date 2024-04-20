@@ -40,18 +40,16 @@ When you deploy this contract, you'll need to pass `ownerFee` and `numberGenerat
 
 ## 1.1 Create the Lobby
 
-Call
 ```solidity
 function createLobby(Color _chosenColor) payable external {
   ...
   emit CreateLobby(lobbyId, msg.sender, msg.value);
 }
 ```
-with argument as **1** for **Blue** or **2** for **Red**. The user must provide the amount of ETH between `minBet` and `maxBet`.
+Call this function with argument as **1** for **Blue** or **2** for **Red**. The user must provide the amount of ETH between `minBet` and `maxBet`.
 
 ## 1.2 Enter the Lobby
 
-Call
 ```solidity
 function enterLobby(uint256 _lobbyId) payable checkLobby(_lobbyId) external {
   ...
@@ -61,12 +59,11 @@ function enterLobby(uint256 _lobbyId) payable checkLobby(_lobbyId) external {
   emit EnterLobby(_lobbyId, msg.sender);
 }
 ```
-with if of the lobby that already exists. The user must provide a value of ETH equal to the lobby's pool (provided by the creator of the lobby).
-Then the `requestId` of the lobby is stored in `mapping request` under the `lobbyId` and will be used later to access the randomly generated number.
+Call the functions with an `id` of the existing lobby. The user must provide a value of ETH equal to the lobby's pool (provided by the creator of the lobby).
+Then the `requestId` of the lobby is stored in mapping `requests` under the `lobbyId` and will be used later to access the randomly generated number.
 
 ## 1.3 Start the Lobby
 
-Call
 ```solidity
 function startLobby(uint256 _lobbyId) checkLobby(_lobbyId) external {
   ...
@@ -80,11 +77,10 @@ function startLobby(uint256 _lobbyId) checkLobby(_lobbyId) external {
   emit Winner(_lobbyId, winner, prize);
 }
 ```
-to finish the game. If the number for this lobby was not generated, the function will be reverted. After the function, the winner will receive the `pool - ownerFee`.
+Call it to finish the game. If the number for this lobby is not generated, the function will be reverted. After the function, the winner will receive the `pool - ownerFee`.
 
 ## 1.4 Close the lobby after some time
 
-Call
 ```solidity
 function closeLobbyAfterTime(uint256 _lobbyId) checkLobby(_lobbyId) external {
   ...
@@ -95,13 +91,12 @@ function closeLobbyAfterTime(uint256 _lobbyId) checkLobby(_lobbyId) external {
   emit CloseLobby(_lobbyId);
 }
 ```
-to close the game. Only the creator of the lobby can close the game after `lobbyLifeTime` has passed and only then the user will receive the pool back.
+Call the function to close a non-full lobby. Only the creator of the lobby can close the game after `lobbyLifeTime` has passed and only then the user will receive the pool back.
 
 ## 1.5 Get the winner of the lobby
 
-Call 
 ```solidity
 function getLobbyWinner(uint256 _lobbyId) checkLobby(_lobbyId) view public returns (address)
 ```
-to get the winner of the lobby that has ended.
+Will return the winner of the lobby, if the lobby exists and has a winner in `Lobby` struct.
 
