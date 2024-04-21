@@ -29,7 +29,7 @@ To generate a random number use this function.
 ```solidity
 function generateRandomNumber() external returns (uint256 requestId)
 ```
-The function returns the `requestId` that will be used later to access the random number and check when the Coordinator fulfills the request. 
+The function returns the `requestId` that will be used later to access the random number and check when the Coordinator fulfills the request.
 
 The Coordinator will call a function when the request is fulfilled.
 ```solidity
@@ -72,6 +72,8 @@ function enterLobby(uint256 _lobbyId) payable checkLobby(_lobbyId) external {
 ```
 Call the functions with an `id` of the existing lobby. The user must provide a value of ETH equal to the lobby's pool (provided by the creator of the lobby).
 Then the `requestId` of the lobby is stored in mapping `requests` under the `lobbyId` and will be used later to access the randomly generated number.
+>[!NOTE]
+>It will take some time to generate a number, and the event will be emitted (you can see it [here](#12-use-generator))
 
 ### 1.3 Start the lobby
 
@@ -131,16 +133,45 @@ function enterRound(Color _betColor) external payable {
   emit EnterRoulette(msg.sender, msg.value, _betColor);
 }
 ```
-The function must be called during `roundTime` after the round is created. The user must provide the amount of ETH between `minBet` and `maxBet`.
+The function must be called during `roundTime` after the round is created. The user must provide `_betColor` (see lower) and the amount of ETH between `minBet` and `maxBet`.
 > [!NOTE]
 > Colors: 1 - Black, 2 - Red, 3 - Green.
+
 > [!IMPORTANT]
-> You have to listen `EnterRoulette` event and user data in the array of `Bet` struct (watch lower), which will be provided later, to pay to all the winners. It should work in this way to decrease the amount of gas and not store arrays in the contract.
+> You have to listen `EnterRoulette` event and user data in the array of `Bet` struct (see lower) **for each color**, which will be provided later, to pay to all the winners. It should work in this way to decrease the amount of gas and not store arrays in the contract.
 >
 > ```solidity
-> struct Bet {
->		address player;
->		Color betColor;
->		uint256 amount;
->	}
->```
+>struct Bet {
+>   address player;
+>   Color betColor;
+>   uint256 amount;
+>}
+> ```
+
+### 1.3 Generate the random number
+```solidity
+function sendRequestForNumber() onlyOwner external
+```
+The function must be called after `roundTime` ended but before closing the current round.
+>[!NOTE]
+>It will take some time to generate a number, and the event will be emitted (you can see it [here](#12-use-generator))
+
+### 1.4 Close the round
+```solidity
+function closeRound(Bet[] calldata _black, Bet[] calldata _red, Bet[] calldata _green) onlyOwner external {
+   require(rounds[roundId].timestamp + roundTime < block.timestamp, "Round is not closed");
+
+   (bool isFullFilled, uint256 number) = Generator.getRequestStatus(currentRequestId);
+   require(isFullFilled, "The request was not fulfilled");
+   ...
+   emit CloseRoulette(roundId, totalPool, winningColor);
+   ...
+    }
+```
+The function will be executed only if `roundTime` has passed and the request has been fulfilled.
+>[!NOTE]
+>Owner must provide 3 arrays: `_black`, `_red`, `_green` with all the bets made during this round.
+The random number will be converted to a range from 0-36, depending on the number in roulette it will choose the winners.
+
+>[!CAUTION]
+>It might be quite expensive to execute this transaction, so you can set a limit for maximum players in a round.
