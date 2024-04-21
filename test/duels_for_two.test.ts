@@ -79,7 +79,7 @@ describe('DuelsForTwo', () => {
 
         const [coordinator, generator] = await loadFixture(deployVRFContracts);
         const duels = await deployDuels(await generator.getAddress());
-        await generator.approve.send(await duels.getAddress(), true);
+        await generator.approve(await duels.getAddress(), true);
 
         await duels
             .connect(bluePlayer)
