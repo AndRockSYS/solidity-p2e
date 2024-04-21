@@ -36,10 +36,15 @@ contract Roulette {
 		uint256 greenPool;
     }
 
+	struct Bet {
+		address player;
+		Color betColor;
+		uint256 amount;
+	}
+
     uint8[] redNumbers = [1,3,5,7,9,12,14,16,18,21,23,25,27,28,30,32,34,36];
 
     mapping(uint256 => Round) public rounds;
-	mapping(uint256 => mapping(address => uint256)) bets;
 
     event CreateRoulette(uint256 round);
     event EnterRoulette(address indexed player, uint256 bet, Color color);
@@ -60,22 +65,20 @@ contract Roulette {
 
         emit CreateRoulette(roundId);
     }
-	//push player to array on backend depends on which color he chose
-    function enterRound(Color _color) external payable {
+	//push player to array on backend depends on which color he chose with struct
+    function enterRound(Color _betColor) external payable {
         require(rounds[roundId].timestamp + roundTime > block.timestamp, "Round is closed");
 		require(msg.value >= minBet, "Your bet is too low");
         require(msg.value <= maxBet, "Your bet is too high");
 
-		bets[roundId][msg.sender] += msg.value;
-
-		if(_color == Color(1))
+		if(_betColor == Color(1))
 			rounds[roundId].blackPool += msg.value;
-		else if(_color == Color(2))
+		else if(_betColor == Color(2))
 			rounds[roundId].redPool += msg.value;
 		else 
 			rounds[roundId].greenPool += msg.value;
 
-        emit EnterRoulette(msg.sender, msg.value, _color);
+        emit EnterRoulette(msg.sender, msg.value, _betColor);
     }
 	//add to readme that need to be called before close round
     function sendRequestForNumber() onlyOwner external {
@@ -83,13 +86,14 @@ contract Roulette {
         currentRequestId = Generator.generateRandomNumber();
     }
 	//data is taking from backend to make it cheaper
-    function closeRound(address[] calldata _black, address[] calldata _red, address[] calldata _green) onlyOwner external {
-		require(currentRequestId == 0, "Request for number was not sent");
+    function closeRound(Bet[] calldata _black, Bet[] calldata _red, Bet[] calldata _green) onlyOwner external {
+		require(rounds[roundId].timestamp + roundTime < block.timestamp, "Round is not closed");
 
         (bool isFullFilled, uint256 number) = Generator.getRequestStatus(currentRequestId);
         require(isFullFilled, "The request was not fullfilled");
 
         Color winningColor = _convertNumberToColor(number);
+		rounds[roundId].winningColor = winningColor;
 
 		(uint256 blackPool, uint256 redPool, uint256 greenPool) = getPools(roundId);
 		uint256 totalPool = blackPool + redPool + greenPool;
@@ -97,8 +101,11 @@ contract Roulette {
 		uint256 winnerPool = winningColor == Color(1) ? blackPool : 
 		winningColor == Color(2) ? redPool : greenPool;
 
-        _payToWinner(winningColor == Color(1) ? _black : 
-		winningColor == Color(2) ? _red : _green, winnerPool, totalPool - winnerPool);
+		uint256 comission = winnerPool * ownerFee / 100;
+
+		if(totalPool > winnerPool + comission) 
+		    _payToWinner(winningColor == Color(1) ? _black : 
+			winningColor == Color(2) ? _red : _green, winnerPool, totalPool - winnerPool - comission);
 
         emit CloseRoulette(roundId, totalPool, winningColor);
 
@@ -125,13 +132,13 @@ contract Roulette {
         return winningColor;
     }
 
-	function _payToWinner(address[] calldata _winners, uint256 _winnerPool, uint256 _prizePool) internal {
-        for(uint256 i = 0; i < _winners.length; i++) {
-			address winner = _winners[i];
+	function _payToWinner(Bet[] calldata _winners, uint256 _winnerPool, uint256 _prizePool) internal {
+		if(_prizePool == 0) return;
 
-			uint256 userBet = bets[roundId][winner];
+		for(uint256 i = 0; i < _winners.length; i++) {
+			Bet memory userBet = _winners[i];
 
-            payable(winner).sendValue(_prizePool * userBet / _winnerPool);
+            payable(userBet.player).sendValue(_prizePool * userBet.amount / _winnerPool + userBet.amount);
         }
 	}
 
