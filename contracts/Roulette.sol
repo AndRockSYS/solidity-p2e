@@ -101,7 +101,7 @@ contract Roulette {
 		uint256 winnerPool = winningColor == Color(1) ? blackPool : 
 		winningColor == Color(2) ? redPool : greenPool;
 
-		uint256 comission = winnerPool * ownerFee / 100;
+		uint256 comission = totalPool * ownerFee / 100;
 
 		if(totalPool > winnerPool + comission) 
 		    _payToWinner(winningColor == Color(1) ? _black : 
