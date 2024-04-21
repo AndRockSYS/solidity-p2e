@@ -82,7 +82,7 @@ contract Roulette {
         require(rounds[roundId].timestamp + roundTime < block.timestamp, "Round is not closed");
         currentRequestId = Generator.generateRandomNumber();
     }
-
+	//data is taking from backend to make it cheaper
     function closeRound(address[] calldata _black, address[] calldata _red, address[] calldata _green) onlyOwner external {
 		require(currentRequestId == 0, "Request for number was not sent");
 
