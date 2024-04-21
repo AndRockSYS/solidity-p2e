@@ -1,3 +1,10 @@
+# Games on Solidity with true randomness
+
+1. [Number Generator](#number-generator)
+2. [Games](#games)
+   - [Duels For Two](#duels-for-two)
+   - [Roulette](#roulette)
+
 # Number Generator
 
 When you deploy this contract, you'll need to pass 3 arguments.
@@ -22,7 +29,7 @@ To generate a random number use this function.
 ```solidity
 function generateRandomNumber() external returns (uint256 requestId)
 ```
-The function returns the `requestId` that will be used later to access the random number and check when the Coordinator fulfills the request. 
+The function returns the `requestId` that will be used later to access the random number and check when the Coordinator fulfills the request.
 
 The Coordinator will call a function when the request is fulfilled.
 ```solidity
@@ -34,11 +41,13 @@ event RequestFulfilled(uint256 requestId, uint256 randomNumber)
 ```
 will be emitted.
 
-# Duels For Two
+# Games
+> [!IMPORTANT]
+> To deploy any game you'll need to pass `ownerFee` and `numberGenerator` - the address of deployed previously `NumberGenerator.sol`.
 
-When you deploy this contract, you'll need to pass `ownerFee` and `numberGenerator` - the address of deployed previously `NumberGenerator.sol`.
+## Duels For Two
 
-## 1.1 Create the Lobby
+### 1.1 Create the lobby
 
 ```solidity
 function createLobby(Color _chosenColor) payable external {
@@ -46,9 +55,11 @@ function createLobby(Color _chosenColor) payable external {
   emit CreateLobby(lobbyId, msg.sender, msg.value);
 }
 ```
-Call this function with argument as **1** for **Blue** or **2** for **Red**. The user must provide the amount of ETH between `minBet` and `maxBet`.
+Call this function to create a new lobby with `Color` argument. The user must provide the amount of ETH between `minBet` and `maxBet`.
+> [!NOTE]
+> 1 - Blue, 2 - Red
 
-## 1.2 Enter the Lobby
+### 1.2 Enter the lobby
 
 ```solidity
 function enterLobby(uint256 _lobbyId) payable checkLobby(_lobbyId) external {
@@ -61,8 +72,10 @@ function enterLobby(uint256 _lobbyId) payable checkLobby(_lobbyId) external {
 ```
 Call the functions with an `id` of the existing lobby. The user must provide a value of ETH equal to the lobby's pool (provided by the creator of the lobby).
 Then the `requestId` of the lobby is stored in mapping `requests` under the `lobbyId` and will be used later to access the randomly generated number.
+>[!NOTE]
+>It will take some time to generate a number, and the event will be emitted (you can see it [here](#12-use-generator))
 
-## 1.3 Start the Lobby
+### 1.3 Start the lobby
 
 ```solidity
 function startLobby(uint256 _lobbyId) checkLobby(_lobbyId) external {
@@ -77,9 +90,9 @@ function startLobby(uint256 _lobbyId) checkLobby(_lobbyId) external {
   emit Winner(_lobbyId, winner, prize);
 }
 ```
-Call it to finish the game. If the number for this lobby is not generated, the function will be reverted. After the function, the winner will receive the `pool - ownerFee`.
+The function will finish the lobby and pick a winner. If the number for this lobby is not generated, the function will be reverted. After the function, the winner will receive the `pool - ownerFee`.
 
-## 1.4 Close the lobby after some time
+### 1.4 Close the lobby after some time
 
 ```solidity
 function closeLobbyAfterTime(uint256 _lobbyId) checkLobby(_lobbyId) external {
@@ -91,12 +104,74 @@ function closeLobbyAfterTime(uint256 _lobbyId) checkLobby(_lobbyId) external {
   emit CloseLobby(_lobbyId);
 }
 ```
-Call the function to close a non-full lobby. Only the creator of the lobby can close the game after `lobbyLifeTime` has passed and only then the user will receive the pool back.
+Call the function to close a non-full lobby. Only the creator of the lobby can close the game after `lobbyLifeTime` has passed and only then will the user receive the pool back.
 
-## 1.5 Get the winner of the lobby
+### 1.5 Get the winner of the lobby
 
 ```solidity
 function getLobbyWinner(uint256 _lobbyId) checkLobby(_lobbyId) view public returns (address)
 ```
 Will return the winner of the lobby, if the lobby exists and has a winner in `Lobby` struct.
 
+## Roulette
+
+> [!IMPORTANT]
+> All the functions connected to this game management, must be called from the owner account.
+
+### 1.1 Create the round
+```solidity
+function createRound() onlyOwner external {
+  ...
+  emit CreateRoulette(roundId);
+}
+```
+Can be called only if the previous round was over.
+### 1.2 Enter the round
+```solidity
+function enterRound(Color _betColor) external payable {
+  ...
+  emit EnterRoulette(msg.sender, msg.value, _betColor);
+}
+```
+The function must be called during `roundTime` after the round is created. The user must provide `_betColor` (see lower) and the amount of ETH between `minBet` and `maxBet`.
+> [!NOTE]
+> Colors: 1 - Black, 2 - Red, 3 - Green.
+
+> [!IMPORTANT]
+> You have to listen `EnterRoulette` event and user data in the array of `Bet` struct (see lower) **for each color**, which will be provided later, to pay to all the winners. It should work in this way to decrease the amount of gas and not store arrays in the contract.
+>
+> ```solidity
+>struct Bet {
+>   address player;
+>   Color betColor;
+>   uint256 amount;
+>}
+> ```
+
+### 1.3 Generate the random number
+```solidity
+function sendRequestForNumber() onlyOwner external
+```
+The function must be called after `roundTime` ended but before closing the current round.
+>[!NOTE]
+>It will take some time to generate a number, and the event will be emitted (you can see it [here](#12-use-generator))
+
+### 1.4 Close the round
+```solidity
+function closeRound(Bet[] calldata _black, Bet[] calldata _red, Bet[] calldata _green) onlyOwner external {
+   require(rounds[roundId].timestamp + roundTime < block.timestamp, "Round is not closed");
+
+   (bool isFullFilled, uint256 number) = Generator.getRequestStatus(currentRequestId);
+   require(isFullFilled, "The request was not fulfilled");
+   ...
+   emit CloseRoulette(roundId, totalPool, winningColor);
+   ...
+    }
+```
+The function will be executed only if `roundTime` has passed and the request has been fulfilled.
+>[!NOTE]
+>Owner must provide 3 arrays: `_black`, `_red`, `_green` with all the bets made during this round.
+The random number will be converted to a range from 0-36, depending on the number in roulette it will choose the winners.
+
+>[!CAUTION]
+>It might be quite expensive to execute this transaction, so you can set a limit for maximum players in a round.
