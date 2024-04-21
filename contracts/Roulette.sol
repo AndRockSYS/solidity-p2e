@@ -65,7 +65,7 @@ contract Roulette {
 
         emit CreateRoulette(roundId);
     }
-	//push player to array on backend depends on which color he chose with struct
+
     function enterRound(Color _betColor) external payable {
         require(rounds[roundId].timestamp + roundTime > block.timestamp, "Round is closed");
 		require(msg.value >= minBet, "Your bet is too low");
@@ -80,7 +80,7 @@ contract Roulette {
 
         emit EnterRoulette(msg.sender, msg.value, _betColor);
     }
-	//add to readme that need to be called before close round
+
     function sendRequestForNumber() onlyOwner external {
         require(rounds[roundId].timestamp + roundTime < block.timestamp, "Round is not closed");
         currentRequestId = Generator.generateRandomNumber();
@@ -90,7 +90,7 @@ contract Roulette {
 		require(rounds[roundId].timestamp + roundTime < block.timestamp, "Round is not closed");
 
         (bool isFullFilled, uint256 number) = Generator.getRequestStatus(currentRequestId);
-        require(isFullFilled, "The request was not fullfilled");
+        require(isFullFilled, "The request was not fulfilled");
 
         Color winningColor = _convertNumberToColor(number);
 		rounds[roundId].winningColor = winningColor;
