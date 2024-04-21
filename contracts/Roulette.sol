@@ -28,7 +28,7 @@ contract Roulette {
 	}
 
     struct Round {
-        Color winColor;
+        Color winningColor;
         uint256 timestamp;
 
 		uint256 blackPool;
@@ -43,7 +43,7 @@ contract Roulette {
 
     event CreateRoulette(uint256 round);
     event EnterRoulette(address indexed player, uint256 bet, Color color);
-    event CloseRoulette(uint256 round, uint256 totalPool, Color winColor);
+    event CloseRoulette(uint256 round, uint256 totalPool, Color winningColor);
 
 	constructor(uint256 _ownerFee, address _numberGenerator) {
 		Generator = NumberGenerator(_numberGenerator);
@@ -54,7 +54,7 @@ contract Roulette {
 
     function createRound() onlyOwner external {
 		Round memory currentRound = rounds[roundId];
-        require(currentRound.winColor == Color(0) && currentRound.timestamp == 0, "Current round is not closed");
+        require(currentRound.winningColor == Color(0) && currentRound.timestamp == 0, "Current round is not closed");
 
         rounds[roundId].timestamp = block.timestamp;
 
@@ -138,6 +138,15 @@ contract Roulette {
 	function getPools(uint256 _roundId) public view returns(uint256, uint256, uint256) {
 		Round memory round = rounds[_roundId];
 		return (round.blackPool, round.redPool, round.greenPool);
+	}
+
+	function getWinningColor(uint256 _roundId) public view returns(Color) {
+		require(_roundId < roundId, "Round does not exist");
+
+		Color winningColor = rounds[_roundId].winningColor;
+		require(winningColor != Color(0), "Round does not have a winner");
+
+		return winningColor;
 	}
 
 	function setOwnerFee(uint256 _newOwnerFee) onlyOwner public {
