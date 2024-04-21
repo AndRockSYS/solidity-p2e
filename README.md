@@ -171,7 +171,11 @@ function closeRound(Bet[] calldata _black, Bet[] calldata _red, Bet[] calldata _
 The function will be executed only if `roundTime` has passed and the request has been fulfilled.
 >[!NOTE]
 >Owner must provide 3 arrays: `_black`, `_red`, `_green` with all the bets made during this round.
-The random number will be converted to a range from 0-36, depending on the number in roulette it will choose the winners.
+
+The random number will be converted to a range from 0-36, depending on the number in roulette it will choose the winners. 
+Then it will pay to all the winners their bet + profit, which is calculated based on their bet.
+
+![Roulette numbers](https://great.com/en-us/wp-content/uploads/sites/2/2022/12/image.png)
 
 >[!CAUTION]
 >It might be quite expensive to execute this transaction, so you can set a limit for maximum players in a round.
