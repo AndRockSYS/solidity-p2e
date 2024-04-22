@@ -91,8 +91,8 @@ describe('Roulette', () => {
 
         await roulette.sendRequestForNumber();
 
-        await expect(roulette.closeRound(black, [], [])).to.be.rejectedWith(
-            'The request was not fullfilled'
+        await expect(roulette.closeRound(black, [], [])).to.be.revertedWith(
+            'The request was not fulfilled'
         );
 
         const requestId = await roulette.currentRequestId();
