@@ -20,7 +20,7 @@ contract Jackpot {
     uint256 public roundId;
 	uint256 public requestId;
 
-    struct Spin {
+    struct Round {
         address winner;
         uint256 pool;
         uint256 timestamp;
@@ -31,7 +31,7 @@ contract Jackpot {
         uint256 amount;
     }
 
-    mapping(uint256 => Spin) public spins;
+    mapping(uint256 => Round) public rounds;
 
     event CreateJackpot(uint256 roundId);
     event EnterJackpot(address indexed player, uint256 bet);
@@ -45,44 +45,45 @@ contract Jackpot {
     }
 
     function createJackpot() onlyOwner external {
-        require(spins[roundId].timestamp == 0, "Previous round is still going");
+        require(rounds[roundId].timestamp == 0, "Previous round is still going");
 
-        spins[roundId].timestamp = block.timestamp;
+        rounds[roundId].timestamp = block.timestamp;
 
         emit CreateJackpot(roundId);
     }
-
 	//save all bets on backend
     function enterJackpot() payable external {
-        require(spins[roundId].timestamp + roundId > block.timestamp, "Round is closed");
+        require(rounds[roundId].timestamp + roundTime > block.timestamp, "Round is closed");
 		require(msg.value >= minBet, "Your bet is too low");
         require(msg.value <= maxBet, "Your bet is too high");
 
-        spins[roundId].pool += msg.value;
+        rounds[roundId].pool += msg.value;
 
         emit EnterJackpot(msg.sender, msg.value);
     }
 
     function sendRequestForNumber() onlyOwner external {
-        require(spins[roundId].timestamp + roundTime < block.timestamp, "Round is not closed");
+        require(rounds[roundId].timestamp + roundTime < block.timestamp, "Round is not closed");
         requestId = Generator.generateRandomNumber();
     }
-    //this function must be run only after event in VRFv2.sol was emited
-    function closeWheel(Bet[] calldata _bets) external onlyOwner {
-        require(spins[roundId].timestamp + roundTime < block.timestamp, "Round is not closed");
 
-        (bool isFullFilled, uint256 number) = Generator.getRequestStatus(requestId);
+    function closeJackpot(Bet[] calldata _bets) external onlyOwner {
+        require(rounds[roundId].timestamp + roundTime < block.timestamp, "Round is not closed");
+
+        (bool isFullFilled, uint256 randomNumber) = Generator.getRequestStatus(requestId);
         require(isFullFilled, "The request was not fulfilled");
 
-        uint256 winningNumber = _convertNumberToWinningNumber(number);
+        uint256 winningNumber = _convertNumberToWinningNumber(randomNumber);
 
-        address winner = _findAWinner(_bets, winningNumber, spins[roundId].pool);
+        address winner = _findAWinner(_bets, winningNumber, rounds[roundId].pool);
 
-		uint256 comission = spins[roundId].pool * ownerFee / 100;
-		uint256 winningAmount = spins[roundId].pool - comission;
+		uint256 comission = rounds[roundId].pool * ownerFee / 100;
+		uint256 winningAmount = rounds[roundId].pool - comission;
 
 		if(winner != address(0))
         	payable(winner).sendValue(winningAmount);
+
+		rounds[roundId].winner = winner;
         
         emit CloseJackpot(winner, winningAmount);
 
