@@ -111,6 +111,7 @@ contract Roulette {
 
         unchecked {
             roundId++;
+			currentRequestId = 0;
         }
     }
 
