@@ -157,6 +157,9 @@ The function must be called after `roundTime` ended but before closing the curre
 >It will take some time to generate a number, and the event will be emitted (you can see it [here](#12-use-generator))
 
 ### 1.4 Close the round
+>[!CAUTION]
+>It might be quite expensive to execute this transaction, so you can set a limit for maximum players in a round.
+
 ```solidity
 function closeRound(Bet[] calldata _black, Bet[] calldata _red, Bet[] calldata _green) onlyOwner external {
    require(rounds[roundId].timestamp + roundTime < block.timestamp, "Round is not closed");
@@ -171,7 +174,8 @@ function closeRound(Bet[] calldata _black, Bet[] calldata _red, Bet[] calldata _
 The function will be executed only if `roundTime` has passed and the request has been fulfilled.
 >[!NOTE]
 >Owner must provide 3 arrays: `_black`, `_red`, `_green` with all the bets made during this round.
-The random number will be converted to a range from 0-36, depending on the number in roulette it will choose the winners.
 
->[!CAUTION]
->It might be quite expensive to execute this transaction, so you can set a limit for maximum players in a round.
+The random number will be converted to a range from 0-36, depending on the number in roulette it will choose the winners. 
+Then it will pay to all the winners their bet + profit, which is calculated based on their bet.
+
+![Roulette numbers](https://great.com/en-us/wp-content/uploads/sites/2/2022/12/image.png)
