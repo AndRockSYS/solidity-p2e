@@ -4,6 +4,7 @@
 2. [Games](#games)
    - [Duels For Two](#duels-for-two)
    - [Roulette](#roulette)
+   - [Jackpot](#jackpot)
 
 # Number Generator
 
@@ -115,9 +116,6 @@ Will return the winner of the lobby, if the lobby exists and has a winner in `Lo
 
 ## Roulette
 
-> [!IMPORTANT]
-> All the functions connected to this game management, must be called from the owner account.
-
 ### 1.1 Create the round
 ```solidity
 function createRound() onlyOwner external {
@@ -125,7 +123,7 @@ function createRound() onlyOwner external {
   emit CreateRoulette(roundId);
 }
 ```
-Can be called only if the previous round was over.
+It can be called only if the previous round was over.
 ### 1.2 Enter the round
 ```solidity
 function enterRound(Color _betColor) external payable {
@@ -158,7 +156,7 @@ The function must be called after `roundTime` ended but before closing the curre
 
 ### 1.4 Close the round
 >[!CAUTION]
->It might be quite expensive to execute this transaction, so you can set a limit for maximum players in a round.
+>It might be quite expensive to execute this transaction so you can set a limit for maximum players in a round.
 
 ```solidity
 function closeRound(Bet[] calldata _black, Bet[] calldata _red, Bet[] calldata _green) onlyOwner external {
@@ -179,3 +177,59 @@ The random number will be converted to a range from 0-36, depending on the numbe
 Then it will pay to all the winners their bet + profit, which is calculated based on their bet.
 
 ![Roulette numbers](https://great.com/en-us/wp-content/uploads/sites/2/2022/12/image.png)
+
+## Jackpot
+
+### 1.1 Create the round
+```solidity
+function createJackpot() onlyOwner external {
+   ...
+   emit CreateJackpot(roundId);
+}
+```
+It can be called only if the previous round is over.
+
+### 1.2 Enter the round
+```solidity
+function enterJackpot() payable external {
+   ...
+   emit EnterJackpot(msg.sender, msg.value);
+}
+```
+The function must be called during `roundTime` after creating the round. The amount of ETH between `minBet` and `maxBet`.
+
+> [!IMPORTANT]
+> All the bets are supposed to be saved outside of the contract, on the backend. Use this struct for that.
+> ```solidity
+>struct Bet {
+>   address player;
+>   uint256 amount;
+>}
+> ```
+
+### 1.3 Generate the random number
+```solidity
+function sendRequestForNumber() onlyOwner external
+```
+The function must be called after `roundTime` ended but before closing the current round.
+>[!NOTE]
+>It will take some time to generate a number, and the event will be emitted (you can see it [here](#12-use-generator))
+
+### 1.4 Close the round
+```solidity
+function closeJackpot(Bet[] calldata _bets) external onlyOwner {
+   ...   
+   emit CloseJackpot(winner, winningAmount);
+   ...
+}
+```
+>[!NOTE]
+>Argument for this function is the array, provided from the backend.
+
+The function must be executed only after the number is generated. The `winner` receives all the `pool` - owner commission.
+
+>[!NOTE]
+>The `winner` is calculated based on an algorithm. The maximum number is **10000** that is corresponding to 100%. Then, depending on the player's bet, we calculate his `winningNumber` and add it to the sum, if the `randomNumber` (that was previously cast to the 10000 range) is small or equal to the sum, the loop will stop and set this player as a `winner`.
+
+>[!CAUTION]
+>It might be quite expensive to execute this transaction so you can set a limit for maximum players in a round.
