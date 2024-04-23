@@ -44,7 +44,7 @@ contract DuelsForTwo is OwnerAccess {
 		Generator = NumberGenerator(_numberGenerator);
 	}
 
-	function createLobby(Color _bettingColor) payable external {
+	function createLobby(Color _bettingColor) payable external returns (Lobby memory, uint256) {
 		require(msg.value >= minBet, "Bet is too low");
 		require(msg.value <= maxBet, "Bet is too high");
 
@@ -61,11 +61,15 @@ contract DuelsForTwo is OwnerAccess {
 		else
 			newLobby.red = msg.sender;
 
-		emit CreateLobby(lobbyId, msg.sender, _bettingColor, msg.value);
+		lobbies[lobbyId] = newLobby;
 
 		unchecked {
 			lobbyId++;
 		}
+
+		emit CreateLobby(lobbyId - 1, msg.sender, _bettingColor, msg.value);
+
+		return (newLobby, lobbyId - 1);
 	}
 
 	function enterLobby(uint256 _lobbyId) payable checkLobby(_lobbyId) external {
