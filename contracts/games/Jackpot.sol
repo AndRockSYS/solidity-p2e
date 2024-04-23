@@ -1,17 +1,16 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.7;
+pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/utils/Address.sol";
 
-import "./chainlink/NumberGenerator.sol";
+import "../OwnerAccess.sol";
 
-contract Jackpot {
+import "../chainlink/NumberGenerator.sol";
+
+contract Jackpot is OwnerAccess {
     using Address for address payable;
 
     NumberGenerator public Generator;
-
-    address owner;
-	uint256 ownerFee;
 
     uint256 minBet = 0.005 ether;
     uint256 maxBet = 1000 ether;
@@ -37,11 +36,8 @@ contract Jackpot {
     event EnterJackpot(address indexed player, uint256 bet);
     event CloseJackpot(address indexed winner, uint256 winningAmount);
 
-    constructor(uint256 _ownerFee, address _numberGenerator) {
+    constructor(uint256 _ownerFee, address _numberGenerator) OwnerAccess(_ownerFee) {
 		Generator = NumberGenerator(_numberGenerator);
-
-      	owner = msg.sender;
-      	ownerFee = _ownerFee;
     }
 
     function createJackpot() onlyOwner external {
@@ -73,9 +69,14 @@ contract Jackpot {
         (bool isFullFilled, uint256 randomNumber) = Generator.getRequestStatus(requestId);
         require(isFullFilled, "The request was not fulfilled");
 
-        uint256 winningNumber = _convertNumberToWinningNumber(randomNumber);
+        uint256 winningNumber; 
+		
+		unchecked {
+			uint16 newRange = uint16(randomNumber);
+        	winningNumber = uint256(newRange) * 10000 / 65536;
+		}
 
-        address winner = _findAWinner(_bets, winningNumber, rounds[roundId].pool);
+        address winner = _calculateAWinner(_bets, winningNumber, rounds[roundId].pool);
 
 		uint256 comission = rounds[roundId].pool * ownerFee / 100;
 		uint256 winningAmount = rounds[roundId].pool - comission;
@@ -93,12 +94,7 @@ contract Jackpot {
         }
     }
 
-	function _convertNumberToWinningNumber(uint256 _number) internal pure returns (uint256) {
-		uint16 newRange = uint16(_number);
-        return uint256(newRange) * 10000 / 65536;
-	}
-
-	function _findAWinner(Bet[] calldata _bets, uint256 _winningNumber, uint256 _pool) internal pure returns (address) {
+	function _calculateAWinner(Bet[] calldata _bets, uint256 _winningNumber, uint256 _pool) internal pure returns (address) {
 		uint256 sum = 0;
 
 		for(uint i = 0; i < _bets.length; i++) {
@@ -110,18 +106,5 @@ contract Jackpot {
 
 		return address(0);
 	}
-
-	function setOwnerFee(uint256 _newOwnerFee) onlyOwner public {
-		ownerFee = _newOwnerFee;
-	}
-
-	function collectFees() onlyOwner external {
-		payable(owner).sendValue(address(this).balance);
-	}
-
-    modifier onlyOwner {
-        require(msg.sender == owner, "You are not the owner");
-        _;
-    }
 
 }

@@ -1,24 +1,23 @@
 //SPDX-License-Identifier:MIT
-pragma solidity ^0.8.7;
+pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/utils/Address.sol";
 
-import "./chainlink/NumberGenerator.sol";
+import "../OwnerAccess.sol";
 
-contract Roulette {
+import "../chainlink/NumberGenerator.sol";
+
+contract Roulette is OwnerAccess {
     using Address for address payable;
 
     NumberGenerator public Generator;
-
-  	address owner;
-  	uint256 ownerFee;
 
     uint256 minBet = 0.005 ether;
     uint256 maxBet = 1000 ether;
     uint256 roundTime = 1 minutes;
 
     uint256 public roundId;
-	uint256 public currentRequestId;
+	uint256 public requestId;
 	
     enum Color { 
 		Unknown, 
@@ -35,7 +34,7 @@ contract Roulette {
 
 	struct Bet {
 		address player;
-		Color bettingColot;
+		Color bettingColor;
 		uint256 amount;
 	}
 
@@ -47,16 +46,12 @@ contract Roulette {
     event EnterRoulette(address indexed player, uint256 bet, Color color);
     event CloseRoulette(uint256 round, uint256 totalPool, Color winningColor);
 
-	constructor(uint256 _ownerFee, address _numberGenerator) {
+	constructor(uint256 _ownerFee, address _numberGenerator) OwnerAccess(_ownerFee) {
 		Generator = NumberGenerator(_numberGenerator);
-
-		owner = msg.sender;
-		setOwnerFee(_ownerFee);
     }
 
     function createRound() onlyOwner external {
-		Round memory currentRound = rounds[roundId];
-        require(currentRound.winningColor == Color(0) && currentRound.timestamp == 0, "Current round is not closed");
+        require(rounds[roundId].timestamp == 0, "Current round is not closed");
 
         rounds[roundId].timestamp = block.timestamp;
 
@@ -82,13 +77,13 @@ contract Roulette {
 
     function sendRequestForNumber() onlyOwner external {
         require(rounds[roundId].timestamp + roundTime < block.timestamp, "Round is not closed");
-        currentRequestId = Generator.generateRandomNumber();
+        requestId = Generator.generateRandomNumber();
     }
 	//call it before closing the round
 	function calculateWinningColor() onlyOwner external view returns (Color) {
 		require(rounds[roundId].timestamp + roundTime < block.timestamp, "Round is not closed");
 
-        (bool isFullFilled, uint256 randomNumber) = Generator.getRequestStatus(currentRequestId);
+        (bool isFullFilled, uint256 randomNumber) = Generator.getRequestStatus(requestId);
         require(isFullFilled, "The request was not fulfilled");
 
 		unchecked {
@@ -128,7 +123,7 @@ contract Roulette {
 
         unchecked {
             roundId++;
-			currentRequestId = 0;
+			requestId = 0;
         }
     }
 
@@ -149,19 +144,6 @@ contract Roulette {
 		require(winningColor != Color.Unknown, "Round does not have a winner");
 
 		return winningColor;
-	}
-
-	function setOwnerFee(uint256 _newOwnerFee) onlyOwner public {
-		ownerFee = _newOwnerFee;
-	}
-
-	function collectFees() onlyOwner external {
-		payable(owner).sendValue(address(this).balance);
-	}
-
-	modifier onlyOwner {
-		require(msg.sender == owner, "You are not an owner");
-		_;
 	}
 
 }

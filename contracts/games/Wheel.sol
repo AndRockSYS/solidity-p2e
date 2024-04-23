@@ -1,17 +1,16 @@
 //SPDX-License-Identifier: MIT
-pragma solidity ^0.8.7;
+pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/utils/Address.sol";
 
-import "./chainlink/NumberGenerator.sol";
+import "../OwnerAccess.sol";
 
-contract Wheel {
+import "../chainlink/NumberGenerator.sol";
+
+contract Wheel is OwnerAccess {
     using Address for address payable;
 
     NumberGenerator public Generator;
-
-  	address owner;
-  	uint256 ownerFee;
 
     uint256 minBet = 0.005 ether;
     uint256 maxBet = 1000 ether;
@@ -48,11 +47,8 @@ contract Wheel {
     event EnterWheel(address indexed player, uint256 bet, Color bettingColor);
     event CloseWheel(Color winningColor, uint256 pool);
 
-    constructor(uint256 _ownerFee, address _numberGenerator) {
+    constructor(uint256 _ownerFee, address _numberGenerator) OwnerAccess(_ownerFee) {
 		Generator = NumberGenerator(_numberGenerator);
-
-      	owner = msg.sender;
-      	ownerFee = _ownerFee;
     }
 
     function createWheel() external onlyOwner {
@@ -149,18 +145,5 @@ contract Wheel {
             payable(userBet.player).sendValue(_prizePool * userBet.amount / _winnerPool + userBet.amount);
         }
 	}
-
-	function setOwnerFee(uint256 _newOwnerFee) onlyOwner public {
-		ownerFee = _newOwnerFee;
-	}
-
-	function collectFees() onlyOwner external {
-		payable(owner).sendValue(address(this).balance);
-	}
-
-    modifier onlyOwner {
-        require(msg.sender == owner, "You are not the owner");
-        _;
-    }
 
 }
