@@ -14,7 +14,7 @@ contract DuelsForTwo is OwnerAccess {
 
   	uint256 minBet = 0.005 ether;
   	uint256 maxBet = 1000 ether;
-	uint256 lobbyLifeTime = 5 minutes;
+	uint256 lobbyTime = 5 minutes;
 
 	uint256 public lobbyId;
 
@@ -94,7 +94,7 @@ contract DuelsForTwo is OwnerAccess {
 		Lobby memory lobby = lobbies[_lobbyId];
 		require(lobby.blue == msg.sender || lobby.red == msg.sender, "You are not in the lobby");
 		require(_isLobbyEmpty(_lobbyId), "Lobby is full");
-		require(lobby.timestamp + lobbyLifeTime <= block.timestamp, "Lobby cannot be closed now");
+		require(lobby.timestamp + lobbyTime <= block.timestamp, "Lobby cannot be closed now");
 
 		payable(msg.sender).sendValue(lobby.pool);
 
