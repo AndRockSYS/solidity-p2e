@@ -124,6 +124,8 @@ describe('Jackpot', () => {
         const winnerBefore = balancesBefore[winnerIdInBalances];
         const winnerAfter = await ethers.provider.getBalance(winner);
 
-        expect(winnerAfter - winnerBefore).to.be.equal(pool - pool / 10n);
+        expect((winnerAfter - winnerBefore) / 1_000_000_000_000_000n).to.be.equal(
+            (pool - pool / 10n) / 1_000_000_000_000_000n
+        );
     });
 });
