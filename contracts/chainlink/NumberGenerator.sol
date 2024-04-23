@@ -4,7 +4,6 @@ pragma solidity ^0.8.7;
 import { VRFCoordinatorV2Interface } from "@chainlink/contracts/src/v0.8/vrf/interfaces/VRFCoordinatorV2Interface.sol";
 import { VRFConsumerBaseV2 } from "@chainlink/contracts/src/v0.8/vrf/VRFConsumerBaseV2.sol";
 
-//add to readme https://docs.chain.link/vrf/v2/subscription/supported-networks
 contract NumberGenerator is VRFConsumerBaseV2 {
 	address owner;
 
@@ -38,13 +37,10 @@ contract NumberGenerator is VRFConsumerBaseV2 {
 
 	function approve(address _contract, bool _isApproved) external {
 		require(msg.sender == owner, "You are not the owner");
-
 		approval[_contract] = _isApproved;
 	}
 
-    function generateRandomNumber() external returns (uint256 requestId) {
-		require(approval[msg.sender], "You are not allowed to use generator");
-
+    function generateRandomNumber() onlyApproved external returns (uint256 requestId) {
         requestId = COORDINATOR.requestRandomWords(
             keyHash,
             subscriptionId,
@@ -71,7 +67,7 @@ contract NumberGenerator is VRFConsumerBaseV2 {
         emit RequestFulfilled(_requestId, _randomWords[0]);
     }
 
-    function getRequestStatus(uint256 _requestId) requestExist(_requestId) external view returns (bool, uint256) {
+    function getRequestStatus(uint256 _requestId) requestExist(_requestId) onlyApproved external view returns (bool, uint256) {
         Request memory request = requests[_requestId];
 
         return (request.fulfilled, request.randomNumber);
@@ -79,6 +75,11 @@ contract NumberGenerator is VRFConsumerBaseV2 {
 
 	modifier requestExist(uint256 _requestId) {
 		require(requests[_requestId].exists, "Request does not exist");
+		_;
+	}
+
+	modifier onlyApproved {
+		require(approval[msg.sender], "You are not allowed to use generator");
 		_;
 	}
 }
