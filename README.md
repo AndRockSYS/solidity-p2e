@@ -107,14 +107,9 @@ function closeLobbyAfterTime(uint256 _lobbyId) checkLobby(_lobbyId) external {
 ```
 Call the function to close a non-full lobby. Only the creator of the lobby can close the game after `lobbyLifeTime` has passed and only then will the user receive the pool back.
 
-### 1.5 Get the winner of the lobby
-
-```solidity
-function getLobbyWinner(uint256 _lobbyId) checkLobby(_lobbyId) view public returns (address)
-```
-Will return the winner of the lobby, if the lobby exists and has a winner in `Lobby` struct.
-
 ## Roulette
+> [!IMPORTANT]
+> REWRITE
 
 ### 1.1 Create the round
 ```solidity
