@@ -5,7 +5,7 @@ import { time, loadFixture } from '@nomicfoundation/hardhat-toolbox/network-help
 import deployVRFContracts from './deploy_vrf';
 import { Roulette } from '../typechain-types';
 
-type Bet = { player: string; betColor: number; amount: bigint };
+type Bet = { player: string; bettingColor: number; amount: bigint };
 
 describe('Roulette', () => {
     async function deployRoulette(generatorAddress: string): Promise<Roulette> {
@@ -19,7 +19,7 @@ describe('Roulette', () => {
 
         return {
             player: signer.address,
-            betColor: color,
+            bettingColor: color,
             amount: oneEther,
         };
     }
@@ -47,7 +47,7 @@ describe('Roulette', () => {
         await makeABet(roulette, 2, second);
         await makeABet(roulette, 3, third);
 
-        const [_winningColor, _timestamp, blackPool, redPool, greenPool] = await roulette.rounds(0);
+        const [blackPool, redPool, greenPool] = await roulette.getPools(0);
 
         expect(blackPool).to.be.equal(redPool);
         expect(redPool).to.be.equal(greenPool);
@@ -71,7 +71,7 @@ describe('Roulette', () => {
 
         await roulette.sendRequestForNumber();
 
-        expect(await roulette.currentRequestId()).to.be.not.equal(0);
+        expect(await roulette.requestId()).to.be.not.equal(0);
     });
 
     it('Should close the round only when the number is generated', async () => {
@@ -83,22 +83,23 @@ describe('Roulette', () => {
         await roulette.createRound();
         await generator.approve(await roulette.getAddress(), true);
 
-        const bet = await makeABet(roulette, 1, player);
-        let black: Bet[] = [];
-        black.push(bet);
+        const bet = await makeABet(roulette, 2, player);
+        let red: Bet[] = [];
+        red.push(bet);
 
         await time.increase(61);
 
         await roulette.sendRequestForNumber();
 
-        await expect(roulette.closeRound(black, [], [])).to.be.revertedWith(
+        await expect(roulette.calculateWinningColor()).to.be.revertedWith(
             'The request was not fulfilled'
         );
 
-        const requestId = await roulette.currentRequestId();
+        const requestId = await roulette.requestId();
         await coordinator.fulfillRandomWords(requestId, await generator.getAddress());
 
-        await roulette.closeRound(black, [], []);
+        const winningColor = await roulette.calculateWinningColor();
+        await roulette.closeRound(winningColor, red);
 
         const round = await roulette.rounds(0);
         expect(round.winningColor).to.not.be.equal(0);
@@ -114,10 +115,9 @@ describe('Roulette', () => {
 
         await roulette.createRound();
 
-        const blackBet = await makeABet(roulette, 1, player);
-        const redBet = await makeABet(roulette, 2, player);
+        await makeABet(roulette, 1, player);
 
-        const black = [blackBet];
+        const redBet = await makeABet(roulette, 2, player);
         const red = [redBet];
 
         await time.increase(61);
@@ -125,10 +125,11 @@ describe('Roulette', () => {
         await generator.approve(await roulette.getAddress(), true);
         await roulette.sendRequestForNumber();
 
-        const requestId = await roulette.currentRequestId();
+        const requestId = await roulette.requestId();
         await coordinator.fulfillRandomWords(requestId, await generator.getAddress());
 
-        await roulette.closeRound(black, red, []);
+        const winningColor = await roulette.calculateWinningColor();
+        await roulette.closeRound(winningColor, red);
 
         const rouletteAddress = await roulette.getAddress();
         expect(await ethers.provider.getBalance(rouletteAddress)).to.be.equal(
@@ -144,11 +145,10 @@ describe('Roulette', () => {
 
         await roulette.createRound();
 
-        let black: Bet[] = [];
-        black.push(await makeABet(roulette, 1, signers[1]));
-        black.push(await makeABet(roulette, 1, signers[2]));
-        black.push(await makeABet(roulette, 1, signers[3]));
-        black.push(await makeABet(roulette, 1, signers[4]));
+        await makeABet(roulette, 1, signers[1]);
+        await makeABet(roulette, 1, signers[2]);
+        await makeABet(roulette, 1, signers[3]);
+        await makeABet(roulette, 1, signers[4]);
 
         let red: Bet[] = [];
         red.push(await makeABet(roulette, 2, signers[5]));
@@ -161,7 +161,7 @@ describe('Roulette', () => {
         await time.increase(61);
         await generator.approve(await roulette.getAddress(), true);
         await roulette.sendRequestForNumber();
-        const requestId = await roulette.currentRequestId();
+        const requestId = await roulette.requestId();
         await coordinator.fulfillRandomWords(requestId, await generator.getAddress());
 
         let balancesBefore = [];
@@ -169,7 +169,8 @@ describe('Roulette', () => {
             balancesBefore.push(await ethers.provider.getBalance(signers[i]));
         }
 
-        await roulette.closeRound(black, red, []);
+        const winningColor = await roulette.calculateWinningColor();
+        await roulette.closeRound(winningColor, red);
 
         //winnerColor will always be red
 
