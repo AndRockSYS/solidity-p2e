@@ -31,7 +31,7 @@ describe('DuelsForTwo', () => {
     it('Should be able to enter non-full duel and generate random number', async () => {
         const [coordinator, generator] = await loadFixture(deployVRFContracts);
         const duels = await deployDuels(await generator.getAddress());
-        await generator.approve.send(await duels.getAddress(), true);
+        await generator.approve(await duels.getAddress(), true);
 
         const [_owner, bluePlayer, redPlayer, thirdPlayer] = await ethers.getSigners();
 
