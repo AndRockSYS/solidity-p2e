@@ -64,14 +64,11 @@ contract Wheel is OwnerAccess {
 		require(msg.value >= minBet, "Your bet is too low");
         require(msg.value <= maxBet, "Your bet is too high");
 
-		if(_bettingColor == Color.Black)
-        	spins[spinId].pools[0] += msg.value;
-		if(_bettingColor == Color.Red)
-			spins[spinId].pools[1] += msg.value;
-		if(_bettingColor == Color.Blue)
-        	spins[spinId].pools[2] += msg.value;
-		if(_bettingColor == Color.Gold)
-        	spins[spinId].pools[3] += msg.value;
+		uint256 poolId = _bettingColor == Color.Black ? 0 :
+		_bettingColor == Color.Red ? 1 :
+		_bettingColor == Color.Blue ? 2 : 3;
+
+        spins[spinId].pools[poolId] += msg.value;
 
         emit EnterWheel(msg.sender, msg.value, _bettingColor);
 
