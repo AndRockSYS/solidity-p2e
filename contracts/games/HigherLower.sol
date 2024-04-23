@@ -3,7 +3,7 @@ pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/utils/Address.sol";
 
-import "./chainlink/PriceFeed.sol";
+import "../chainlink/PriceFeed.sol";
 
 contract HigherLower {
     using Address for address payable;
