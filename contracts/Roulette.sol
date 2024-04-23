@@ -29,16 +29,13 @@ contract Roulette {
 
     struct Round {
         Color winningColor;
-        uint256 timestamp;
-
-		uint256 blackPool;
-		uint256 redPool;
-		uint256 greenPool;
+		uint256[3] pools;
+		uint256 timestamp;
     }
 
 	struct Bet {
 		address player;
-		Color betColor;
+		Color bettingColot;
 		uint256 amount;
 	}
 
@@ -66,71 +63,73 @@ contract Roulette {
         emit CreateRoulette(roundId);
     }
 
-    function enterRound(Color _betColor) external payable {
+    function enterRound(Color _bettingColor) external payable returns (Bet memory) {
         require(rounds[roundId].timestamp + roundTime > block.timestamp, "Round is closed");
 		require(msg.value >= minBet, "Your bet is too low");
         require(msg.value <= maxBet, "Your bet is too high");
 
-		if(_betColor == Color(1))
-			rounds[roundId].blackPool += msg.value;
-		else if(_betColor == Color(2))
-			rounds[roundId].redPool += msg.value;
-		else 
-			rounds[roundId].greenPool += msg.value;
+		if(_bettingColor == Color.Black)
+        	rounds[roundId].pools[0] += msg.value;
+		if(_bettingColor == Color.Red)
+			rounds[roundId].pools[1] += msg.value;
+		if(_bettingColor == Color.Green)
+        	rounds[roundId].pools[2] += msg.value;
 
-        emit EnterRoulette(msg.sender, msg.value, _betColor);
+        emit EnterRoulette(msg.sender, msg.value, _bettingColor);
+
+		return Bet(msg.sender, _bettingColor, msg.value);
     }
 
     function sendRequestForNumber() onlyOwner external {
         require(rounds[roundId].timestamp + roundTime < block.timestamp, "Round is not closed");
         currentRequestId = Generator.generateRandomNumber();
     }
-	//data is taking from backend to make it cheaper
-    function closeRound(Bet[] calldata _black, Bet[] calldata _red, Bet[] calldata _green) onlyOwner external {
+	//call it before closing the round
+	function calculateWinningColor() onlyOwner external view returns (Color) {
 		require(rounds[roundId].timestamp + roundTime < block.timestamp, "Round is not closed");
 
-        (bool isFullFilled, uint256 number) = Generator.getRequestStatus(currentRequestId);
+        (bool isFullFilled, uint256 randomNumber) = Generator.getRequestStatus(currentRequestId);
         require(isFullFilled, "The request was not fulfilled");
 
-        Color winningColor = _convertNumberToColor(number);
-		rounds[roundId].winningColor = winningColor;
+		unchecked {
+			uint8 newRange = uint8(randomNumber);
+			uint16 winningNumber = uint16(newRange) * 37 / 256;
 
-		(uint256 blackPool, uint256 redPool, uint256 greenPool) = getPools(roundId);
-		uint256 totalPool = blackPool + redPool + greenPool;
+			Color winningColor = winningNumber == 0 ? Color.Green : Color.Black;
 
-		uint256 winnerPool = winningColor == Color(1) ? blackPool : 
-		winningColor == Color(2) ? redPool : greenPool;
+        	for(uint8 i = 0; i < redNumbers.length; i++) {
+           		if(redNumbers[i] == winningNumber) 
+					winningColor = Color.Red;
+        	}
+
+			return winningColor;
+		}
+	}
+	//data is taking from backend to make it cheaper
+    function closeRound(Color _winningColor, Bet[] calldata _winningBets) onlyOwner external {
+		rounds[roundId].winningColor = _winningColor;
+		Round memory round = rounds[roundId];
+
+		uint256 totalPool;
+		for(uint8 i = 0; i < 3; i++) {
+			totalPool += round.pools[i];
+		}
 
 		uint256 comission = totalPool * ownerFee / 100;
+		uint256 poolToPay = totalPool - comission;
 
-		if(totalPool > winnerPool + comission) 
-		    _payToWinner(winningColor == Color(1) ? _black : 
-			winningColor == Color(2) ? _red : _green, winnerPool, totalPool - winnerPool - comission);
+		uint256 poolId = _winningColor == Color.Black ? 0 : 
+		_winningColor == Color.Red ? 1 : 2;
 
-        emit CloseRoulette(roundId, totalPool, winningColor);
+		if(poolToPay > round.pools[poolId]) 
+		    _payToWinner(_winningBets, round.pools[poolId], poolToPay - round.pools[poolId]);
+
+        emit CloseRoulette(roundId, poolToPay, _winningColor);
 
         unchecked {
             roundId++;
 			currentRequestId = 0;
         }
-    }
-
-    function _convertNumberToColor(uint256 _number) internal view returns (Color) {
-		uint16 winningNumber;
-
-		unchecked {
-			uint8 newRange = uint8(_number);
-			winningNumber = uint16(newRange) * 37 / 256;
-		}
-
-		Color winningColor = winningNumber == 0 ? Color(3) : Color(1);
-
-        for(uint8 i = 0; i < redNumbers.length; i++) {
-            if(redNumbers[i] == winningNumber) 
-				winningColor = Color(2);
-        }
-
-        return winningColor;
     }
 
 	function _payToWinner(Bet[] calldata _winners, uint256 _winnerPool, uint256 _prizePool) internal {
@@ -143,16 +142,11 @@ contract Roulette {
         }
 	}
 
-	function getPools(uint256 _roundId) public view returns(uint256, uint256, uint256) {
-		Round memory round = rounds[_roundId];
-		return (round.blackPool, round.redPool, round.greenPool);
-	}
-
-	function getWinningColor(uint256 _roundId) public view returns(Color) {
+	function getWinningColor(uint256 _roundId) public view returns (Color) {
 		require(_roundId < roundId, "Round does not exist");
 
 		Color winningColor = rounds[_roundId].winningColor;
-		require(winningColor != Color(0), "Round does not have a winner");
+		require(winningColor != Color.Unknown, "Round does not have a winner");
 
 		return winningColor;
 	}
