@@ -27,14 +27,14 @@ contract Roulette is OwnerAccess {
 	}
 
     struct Round {
-        Color winningColor;
 		uint256[3] pools;
+        Color winningColor;
 		uint256 timestamp;
     }
 
 	struct Bet {
 		address player;
-		Color bettingColor;
+		Color bettingColor; 
 		uint256 amount;
 	}
 
@@ -63,12 +63,9 @@ contract Roulette is OwnerAccess {
 		require(msg.value >= minBet, "Your bet is too low");
         require(msg.value <= maxBet, "Your bet is too high");
 
-		if(_bettingColor == Color.Black)
-        	rounds[roundId].pools[0] += msg.value;
-		if(_bettingColor == Color.Red)
-			rounds[roundId].pools[1] += msg.value;
-		if(_bettingColor == Color.Green)
-        	rounds[roundId].pools[2] += msg.value;
+		uint256 poolId = _bettingColor == Color.Black ? 0 : 
+		_bettingColor == Color.Red ? 1 : 2;
+        rounds[roundId].pools[poolId] += msg.value;
 
         emit EnterRoulette(msg.sender, msg.value, _bettingColor);
 
@@ -128,13 +125,17 @@ contract Roulette is OwnerAccess {
     }
 
 	function _payToWinner(Bet[] calldata _winners, uint256 _winnerPool, uint256 _prizePool) internal {
-		if(_prizePool == 0) return;
+		if(_prizePool == 0 || _winners.length == 0) return;
 
 		for(uint256 i = 0; i < _winners.length; i++) {
 			Bet memory userBet = _winners[i];
 
             payable(userBet.player).sendValue(_prizePool * userBet.amount / _winnerPool + userBet.amount);
         }
+	}
+
+	function getPools(uint256 _roundId) public view returns (uint256[3] memory) {
+		return rounds[_roundId].pools;
 	}
 
 	function getWinningColor(uint256 _roundId) public view returns (Color) {
