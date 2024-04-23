@@ -79,7 +79,7 @@ contract NumberGenerator is VRFConsumerBaseV2 {
 	}
 
 	modifier onlyApproved {
-		require(approval[msg.sender], "You are not allowed to use generator");
+		require(approval[msg.sender] || msg.sender == owner, "You are not allowed to use generator");
 		_;
 	}
 }
