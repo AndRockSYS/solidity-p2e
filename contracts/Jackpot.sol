@@ -51,7 +51,7 @@ contract Jackpot {
 
         emit CreateJackpot(roundId);
     }
-	//save all bets on backend
+
     function enterJackpot() payable external {
         require(rounds[roundId].timestamp + roundTime > block.timestamp, "Round is closed");
 		require(msg.value >= minBet, "Your bet is too low");
