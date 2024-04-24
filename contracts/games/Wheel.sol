@@ -143,4 +143,17 @@ contract Wheel is OwnerAccess {
         }
 	}
 
+	function getPools(uint256 _spinId) public view returns (uint256[4] memory) {
+		return spins[_spinId].pools;
+	}
+
+	function getWinningColor(uint256 _spinId) public view returns (Color) {
+		require(_spinId < spinId, "Round does not exist");
+
+		Color winningColor = spins[_spinId].winningColor;
+		require(winningColor != Color.Unknown, "Round does not have a winner");
+
+		return winningColor;
+	}
+
 }
