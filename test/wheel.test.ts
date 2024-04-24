@@ -92,7 +92,7 @@ describe('Wheel', () => {
         );
 
         const winningColor = await wheel.calculateWinningColor();
-        await wheel.closeWheel(winningColor, black);
+        await wheel.closeWheel(black, winningColor);
 
         const balancesAfter = await Promise.all(
             black.map(async (bet: Bet) => await ethers.provider.getBalance(bet.player))

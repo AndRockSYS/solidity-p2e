@@ -99,7 +99,7 @@ describe('Roulette', () => {
         await coordinator.fulfillRandomWords(requestId, await generator.getAddress());
 
         const winningColor = await roulette.calculateWinningColor();
-        await roulette.closeRound(winningColor, red);
+        await roulette.closeRound(red, winningColor);
 
         const round = await roulette.rounds(0);
         expect(round.winningColor).to.not.be.equal(0);
@@ -129,7 +129,7 @@ describe('Roulette', () => {
         await coordinator.fulfillRandomWords(requestId, await generator.getAddress());
 
         const winningColor = await roulette.calculateWinningColor();
-        await roulette.closeRound(winningColor, red);
+        await roulette.closeRound(red, winningColor);
 
         const rouletteAddress = await roulette.getAddress();
         expect(await ethers.provider.getBalance(rouletteAddress)).to.be.equal(
@@ -170,7 +170,7 @@ describe('Roulette', () => {
         }
 
         const winningColor = await roulette.calculateWinningColor();
-        await roulette.closeRound(winningColor, red);
+        await roulette.closeRound(red, winningColor);
 
         //winnerColor will always be red
 
