@@ -1,15 +1,11 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "@openzeppelin/contracts/utils/Address.sol";
-
-import "../OwnerAccess.sol";
-
 import "../chainlink/NumberGenerator.sol";
 
-contract Wheel is OwnerAccess {
-    using Address for address payable;
+import "../utils/PaymentManagement.sol";
 
+contract Wheel is PaymentManagement {
     NumberGenerator public Generator;
 
     uint256 minBet = 0.005 ether;
@@ -35,19 +31,13 @@ contract Wheel is OwnerAccess {
         uint256 timestamp;
     }
 
-	struct Bet {
-		address player;
-		Color bettingColor;
-		uint256 amount;
-	}
-
     mapping(uint256 => Spin) public spins;
 
     event CreateWheel(uint256 spinId);
     event EnterWheel(address indexed player, uint256 bet, Color bettingColor);
-    event CloseWheel(Color winningColor, uint256 pool);
+    event CloseWheel(uint256 spinId, Color winningColor, uint256 pool);
 
-    constructor(uint256 _ownerFee, address _numberGenerator) OwnerAccess(_ownerFee) {
+    constructor(uint256 _ownerFee, address _numberGenerator) PaymentManagement(_ownerFee) {
 		Generator = NumberGenerator(_numberGenerator);
     }
 
@@ -72,7 +62,7 @@ contract Wheel is OwnerAccess {
 
         emit EnterWheel(msg.sender, msg.value, _bettingColor);
 
-		return Bet(msg.sender, _bettingColor, msg.value);
+		return Bet(msg.sender, msg.value);
     }
 
     function sendRequestForNumber() onlyOwner external {
@@ -106,42 +96,28 @@ contract Wheel is OwnerAccess {
     }
 	// * call setWinningColor before and then closeWheel with array of winners
 	//	Wheel has 24 black 15 red 10 blue 1 gold
-    function closeWheel(Color _winningColor, Bet[] calldata _winnerBets) external onlyOwner {
+    function closeWheel(Bet[] calldata _winningBets, Color _winningColor) external onlyOwner {
 		spins[spinId].winningColor = _winningColor;
 		Spin memory spin = spins[spinId];
+
+		uint256 winningPoolId = spin.winningColor == Color.Black ? 0 :
+		spin.winningColor == Color.Red ? 1 :
+		spin.winningColor == Color.Blue ? 2 : 3;
 
 		uint256 totalPool;
 		for(uint8 i = 0; i < 4; i++) {
 			totalPool += spin.pools[i];
 		}
 
-        uint256 comission = totalPool * ownerFee / 100;
-		uint256 poolToPay = totalPool - comission;
+		uint256 prizePool = _payToWinnersBasedOnTheirBet(_winningBets, spin.pools[winningPoolId], totalPool);
 
-		uint256 poolId = spin.winningColor == Color.Black ? 0 :
-		spin.winningColor == Color.Red ? 1 :
-		spin.winningColor == Color.Blue ? 2 : 3;
-
-		if(poolToPay > spin.pools[poolId]) 
-			_payToWinners(_winnerBets, spin.pools[poolId], poolToPay - spin.pools[poolId]);
-
-        emit CloseWheel(spin.winningColor, poolToPay);
+        emit CloseWheel(spinId, spin.winningColor, prizePool);
 
         unchecked {
             spinId++;
 			requestId = 0;
         }
     }
-
-	function _payToWinners(Bet[] calldata _winners, uint256 _winnerPool, uint256 _prizePool) internal {
-		if(_prizePool == 0) return;
-
-		for(uint256 i = 0; i < _winners.length; i++) {
-			Bet memory userBet = _winners[i];
-
-            payable(userBet.player).sendValue(_prizePool * userBet.amount / _winnerPool + userBet.amount);
-        }
-	}
 
 	function getPools(uint256 _spinId) public view returns (uint256[4] memory) {
 		return spins[_spinId].pools;

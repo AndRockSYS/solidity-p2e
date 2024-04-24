@@ -1,15 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "@openzeppelin/contracts/utils/Address.sol";
-
-import "../OwnerAccess.sol";
-
 import "../chainlink/NumberGenerator.sol";
 
-contract Jackpot is OwnerAccess {
-    using Address for address payable;
+import "../utils/PaymentManagement.sol";
 
+contract Jackpot is PaymentManagement {
     NumberGenerator public Generator;
 
     uint256 minBet = 0.005 ether;
@@ -25,18 +21,13 @@ contract Jackpot is OwnerAccess {
         uint256 timestamp;
     }
 
-    struct Bet {
-        address player;
-        uint256 amount;
-    }
-
     mapping(uint256 => Round) public rounds;
 
     event CreateJackpot(uint256 roundId);
     event EnterJackpot(address indexed player, uint256 bet);
     event CloseJackpot(address indexed winner, uint256 winningAmount);
 
-    constructor(uint256 _ownerFee, address _numberGenerator) OwnerAccess(_ownerFee) {
+    constructor(uint256 _ownerFee, address _numberGenerator) PaymentManagement(_ownerFee) {
 		Generator = NumberGenerator(_numberGenerator);
     }
 
@@ -48,7 +39,7 @@ contract Jackpot is OwnerAccess {
         emit CreateJackpot(roundId);
     }
 
-    function enterJackpot() payable external {
+    function enterJackpot() payable external returns (Bet memory) {
         require(rounds[roundId].timestamp + roundTime > block.timestamp, "Round is closed");
 		require(msg.value >= minBet, "Your bet is too low");
         require(msg.value <= maxBet, "Your bet is too high");
@@ -56,6 +47,8 @@ contract Jackpot is OwnerAccess {
         rounds[roundId].pool += msg.value;
 
         emit EnterJackpot(msg.sender, msg.value);
+
+		return Bet(msg.sender, msg.value);
     }
 
     function sendRequestForNumber() onlyOwner external {
@@ -77,16 +70,11 @@ contract Jackpot is OwnerAccess {
 		}
 
         address winner = _calculateAWinner(_bets, winningNumber, rounds[roundId].pool);
-
-		uint256 comission = rounds[roundId].pool * ownerFee / 100;
-		uint256 winningAmount = rounds[roundId].pool - comission;
-
-		if(winner != address(0))
-        	payable(winner).sendValue(winningAmount);
-
 		rounds[roundId].winner = winner;
+
+		uint256 prizePool = _payToWinnedTheWholeSum(winner, rounds[roundId].pool, true);
         
-        emit CloseJackpot(winner, winningAmount);
+        emit CloseJackpot(winner, prizePool);
 
         unchecked {
             roundId++;

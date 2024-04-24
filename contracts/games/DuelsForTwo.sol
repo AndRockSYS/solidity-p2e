@@ -1,15 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "@openzeppelin/contracts/utils/Address.sol";
-
-import "../OwnerAccess.sol";
-
 import "../chainlink/NumberGenerator.sol";
 
-contract DuelsForTwo is OwnerAccess {
-  	using Address for address payable;
+import "../utils/PaymentManagement.sol";
 
+contract DuelsForTwo is PaymentManagement {
   	NumberGenerator public Generator;
 
   	uint256 minBet = 0.005 ether;
@@ -40,7 +36,7 @@ contract DuelsForTwo is OwnerAccess {
   	event CloseLobby(uint256 lobby);
   	event StartLobby(uint256 lobby, address indexed winner, uint256 amount);
 
-	constructor(uint16 _ownerFee, address _numberGenerator) OwnerAccess(_ownerFee){
+	constructor(uint16 _ownerFee, address _numberGenerator) PaymentManagement(_ownerFee){
 		Generator = NumberGenerator(_numberGenerator);
 	}
 
@@ -96,7 +92,7 @@ contract DuelsForTwo is OwnerAccess {
 		require(_isLobbyEmpty(_lobbyId), "Lobby is full");
 		require(lobby.timestamp + lobbyTime <= block.timestamp, "Lobby cannot be closed now");
 
-		payable(msg.sender).sendValue(lobby.pool);
+		_payToWinnedTheWholeSum(msg.sender, lobby.pool, false);
 
 		emit CloseLobby(_lobbyId);
 	}
@@ -112,12 +108,9 @@ contract DuelsForTwo is OwnerAccess {
 		lobbies[_lobbyId].winningColor = randomNumber % 2 == 0 ? Color.Blue : Color.Red;
 		address winner = getLobbyWinner(_lobbyId);
 
-		uint256 fee = lobby.pool * ownerFee / 100;
-		uint256 prize = lobby.pool - fee;
+		uint256 prizePool = _payToWinnedTheWholeSum(winner, lobby.pool, true); 
 
-		payable(winner).sendValue(prize);
-
-		emit StartLobby(_lobbyId, winner, prize);
+		emit StartLobby(_lobbyId, winner, prizePool);
 	}
 
 	function getLobbyWinner(uint256 _lobbyId) checkLobby(_lobbyId) view public returns (address) {
