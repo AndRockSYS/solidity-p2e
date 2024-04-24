@@ -88,7 +88,7 @@ contract Roulette is PaymentManagement {
 		}
 	}
 
-    function closeRound(Color _winningColor, Bet[] calldata _winningBets) onlyOwner external {
+    function closeRound(Bet[] calldata _winningBets, Color _winningColor) onlyOwner external {
 		rounds[roundId].winningColor = _winningColor;
 		Round memory round = rounds[roundId];
 
