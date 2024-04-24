@@ -34,6 +34,16 @@ contract PaymentManagement is Ownable {
 		return prizePool;
 	}
 
+	function _payToWinnedTheWholeSum(address _winner, uint256 _totalPool, bool _withFee) internal returns (uint256) {
+		uint256 fee = _totalPool * ownerFee / 100;
+		uint256 prizePool = _totalPool - fee;
+
+		if(_winner != address(0))
+			payable(_winner).sendValue(_withFee ? prizePool : _totalPool);
+
+		return prizePool;
+	}
+
 	function setOwnerFee(uint256 _newOwnerFee) onlyOwner public {
 		ownerFee = _newOwnerFee;
 	}
