@@ -8,7 +8,7 @@ import "../security/Ownable.sol";
 contract PaymentManagement is Ownable {
 	using Address for address payable;
 
-	uint256 ownerFee;
+	uint256 public ownerFee;
 
 	struct Bet {
 		address player;
@@ -23,13 +23,12 @@ contract PaymentManagement is Ownable {
 		uint256 comission = _totalPool * ownerFee / 100;
 		uint256 prizePool = _totalPool - comission;
 
-		if(_winners.length > 0 && prizePool > _winningPool) {
+		if(_winners.length > 0 && prizePool > _winningPool)
 			for(uint256 i = 0; i < _winners.length; i++) {
 				Bet memory bet = _winners[i];
 
-				payable(bet.player).sendValue(prizePool * bet.amount / _winningPool + bet.amount);
+				payable(bet.player).sendValue((prizePool - _winningPool) * bet.amount / _winningPool + bet.amount);
         	}
-		}
 
 		return prizePool;
 	}
