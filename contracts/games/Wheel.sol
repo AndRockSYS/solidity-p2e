@@ -48,7 +48,7 @@ contract Wheel is PaymentManagement {
 
         emit CreateWheel(spinId);
     }
-	//saving players on backend
+
     function enterWheel(Color _bettingColor) payable external returns (Bet memory) {
         require(spins[spinId].timestamp + roundTime > block.timestamp, "Round is closed");
 		require(msg.value >= minBet, "Your bet is too low");
@@ -94,8 +94,7 @@ contract Wheel is PaymentManagement {
 			return Color.Red;
 		}
     }
-	// * call setWinningColor before and then closeWheel with array of winners
-	//	Wheel has 24 black 15 red 10 blue 1 gold
+
     function closeWheel(Bet[] calldata _winningBets, Color _winningColor) external onlyOwner {
 		spins[spinId].winningColor = _winningColor;
 		Spin memory spin = spins[spinId];
