@@ -3,18 +3,13 @@ pragma solidity ^0.8.7;
 
 import { AggregatorV3Interface } from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 
-//add to readme https://docs.chain.link/data-feeds/price-feeds/addresses?network=ethereum&page=1
-contract PriceFeed {
-	address owner;
+import { Ownable } from "../security/Ownable.sol";
 
+//add to readme https://docs.chain.link/data-feeds/price-feeds/addresses?network=ethereum&page=1
+contract PriceFeed is Ownable {
 	mapping(string => mapping(string => address)) public feeds;
 
-    constructor() {
-        owner = msg.sender;
-    }
-
-	function addPriceFeed(string calldata _symbolIn, string calldata _symbolOut, address _priceFeed) external {
-		require(msg.sender == owner, "You are not an owner");
+	function addPriceFeed(string calldata _symbolIn, string calldata _symbolOut, address _priceFeed) onlyOwner external {
 		feeds[_symbolIn][_symbolOut] = _priceFeed;
 	}
 
