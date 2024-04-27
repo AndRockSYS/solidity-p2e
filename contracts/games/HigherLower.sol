@@ -1,4 +1,3 @@
-//TODO NEED TO BE REMADE
 //SPDX-License-Identifier:MIT
 pragma solidity ^0.8.19;
 
@@ -6,15 +5,13 @@ import "@openzeppelin/contracts/utils/Address.sol";
 
 import "../chainlink/PriceFeed.sol";
 
-contract HigherLower {
-    using Address for address payable;
+import "../utils/PaymentManagement.sol";
 
+contract HigherLower is PaymentManagement {
     PriceFeed public Feed;
 
-    address owner;
-    uint256 ownerFee;
-
-    uint256 bet = 1 ether;
+    uint256 minBet = 0.005 ether;
+	uint256 maxBet = 1 ether;
 	uint256 roundTime = 60 seconds;
 
     uint256 public roundId;
@@ -25,13 +22,12 @@ contract HigherLower {
 		Equal, 
 		Higher
 	}
-
 	//address[] higher, address[] lower - will be stored on backend to save gas
     struct Round {
-		int256 startPrice;
-		int256 endPrice;
+		string[2] symbols;
+		int256[2] prices;
         Prediction result;
-		uint256 pool;
+		uint256[2] pools;
 		uint256 timestamp;
     }
 
@@ -41,78 +37,80 @@ contract HigherLower {
     event EnterRound(address indexed player, uint256 bet, Prediction prediction);
     event CloseRound(uint256 roundId, int256 endPrice, Prediction result);
 
-    constructor(uint256 _ownerFee, address _priceFeed) {
+    constructor(uint256 _ownerFee, address _priceFeed) PaymentManagement(_ownerFee) {
 		Feed = PriceFeed(_priceFeed);
-
-        owner = msg.sender;
-		setOwnerFee(_ownerFee);
     }
 
-    function createRound(string calldata _symbolIn, string calldata _symbolOut) external onlyOwner {
+    function createRound(string[2] calldata _symbols) external onlyOwner {
         require(rounds[roundId].result == Prediction(0), "Current round is not closed");
-		(int256 startPrice, ) = Feed.getLatestPriceFeed(_symbolIn, _symbolOut);
+		(int256 startPrice, ) = Feed.getLatestPriceFeed(_symbols);
 
+		rounds[roundId].symbols = _symbols;
+		rounds[roundId].prices[0] = startPrice;
         rounds[roundId].timestamp = block.timestamp;
 
         emit CreateRound(roundId, startPrice);
-    }
-	//add to readme - add player to backend dependin on its prediction
-    function enterRound(Prediction _prediction) external payable {
-		require(rounds[roundId].timestamp + roundTime > block.timestamp, "Round is closed");
-		require(msg.value == bet, "Your bet is not correct");
 
-        rounds[roundId].pool += msg.value;
-
-        emit EnterRound(msg.sender, msg.value, _prediction);
-    }
-	//send arrays from backend
-    function closeRound(string calldata _symbolIn, string calldata _symbolOut, address[] calldata _higher, address[] calldata _lower) external onlyOwner {
-		Round memory currentRound = rounds[roundId];
-        require(currentRound.timestamp + roundTime <= block.timestamp, "Round is still going");
-
-        (int256 newPrice, uint256 updatedAt) = Feed.getLatestPriceFeed(_symbolIn, _symbolOut);
-        require(updatedAt >= currentRound.timestamp, "The price was not updated yet");
-
-		rounds[roundId].endPrice = newPrice;
-		
-		Prediction result = newPrice > currentRound.startPrice ? Prediction(3) :
-		newPrice < currentRound.startPrice ? Prediction(1) : Prediction(2);
-		rounds[roundId].result = result;
- 
-        uint256 fee = currentRound.pool * ownerFee / 100;
-        uint256 prize = currentRound.pool - fee;
-
-		if(result == Prediction(1))
-			_payToWinners(_lower, prize);
-		if(result == Prediction(3))
-			_payToWinners(_higher, prize);
-
-        emit CloseRound(roundId, newPrice, result);
-
-        unchecked {
+		unchecked {
             roundId++;
         }
     }
+	//add to readme - add player to backend dependin on its prediction
+    function enterRound(uint256 _roundId, Prediction _prediction) external payable {
+		require(rounds[_roundId].timestamp + roundTime > block.timestamp, "Round is closed");
+		require(msg.value >= minBet, "Your bet is too low");
+        require(msg.value <= maxBet, "Your bet is too high");
 
-	function _payToWinners(address[] calldata _winners, uint256 _prize) internal {
-		uint256 perAddress = _prize / _winners.length;
+		uint8 poolId = _prediction == Prediction.Higher ? 1 : 0;
+        rounds[_roundId].pools[poolId] += msg.value;
 
-		for(uint256 i = 0; i < _winners.length; i++) {
-			payable(_winners[i]).sendValue(perAddress);
-		}
-	}
-
-	function setOwnerFee(uint256 _newOwnerFee) onlyOwner public {
-		ownerFee = _newOwnerFee;
-	}
-
-	function collectFees() onlyOwner external {
-		payable(owner).sendValue(address(this).balance);
-	}
-
-    modifier onlyOwner {
-        require(msg.sender == owner, "You are not the owner");
-        _;
+        emit EnterRound(msg.sender, msg.value, _prediction);
     }
+
+	function calculateWinner(uint256 _roundId) external onlyOwner returns (Prediction) {
+		Round memory round = rounds[_roundId];
+		require(round.timestamp + roundTime < block.timestamp, "Round is not closed");
+
+		(int256 endPrice, uint256 updatedAt) = Feed.getLatestPriceFeed(round.symbols);
+		require(round.timestamp < updatedAt, "Price was not updated");
+
+		rounds[_roundId].prices[1] = endPrice;
+
+		Prediction result = getResult(_roundId);
+		rounds[_roundId].result = result;
+		return result;
+	}
+	//send an array of winners depending on the result of getResult()
+    function closeRound(uint256 _roundId, Bet[] calldata _winners) external onlyOwner {
+		Round memory round = rounds[_roundId];
+
+		if(round.result != Prediction.Equal) {
+			uint256 winningPoolId = round.result == Prediction.Higher ? 1 : 0;
+			uint256 winningPool = round.pools[winningPoolId];
+
+			uint256 totalPool;
+			for(uint8 i = 0; i < 2; i++) {
+				totalPool += round.pools[i];
+			}
+			_payToWinnersBasedOnTheirBet(_winners, winningPool, totalPool);
+		}
+
+        emit CloseRound(_roundId, round.prices[1], round.result);
+    }
+
+	function getResult(uint256 _roundId) public view returns (Prediction) {
+		require(_roundId >= roundId, "Round does not exist");
+
+		int256[2] memory prices = rounds[_roundId].prices;
+
+		if(prices[0] > prices[1])
+			return Prediction.Lower;
+		if(prices[0] < prices[1])
+			return Prediction.Higher;
+		if(prices[0] == prices[1])
+			return Prediction.Equal;
+
+		return Prediction.Unknown;
+	}
 
 }
