@@ -22,7 +22,7 @@ contract HigherLower is PaymentManagement {
 		Equal, 
 		Higher
 	}
-	//address[] higher, address[] lower - will be stored on backend to save gas
+
     struct Round {
 		string[2] symbols;
 		int256[2] prices;
@@ -42,7 +42,6 @@ contract HigherLower is PaymentManagement {
     }
 
     function createRound(string[2] calldata _symbols) external onlyOwner {
-        require(rounds[roundId].result == Prediction(0), "Current round is not closed");
 		(int256 startPrice, ) = Feed.getLatestPriceFeed(_symbols);
 
 		rounds[roundId].symbols = _symbols;
@@ -56,7 +55,7 @@ contract HigherLower is PaymentManagement {
         }
     }
 	//add to readme - add player to backend dependin on its prediction
-    function enterRound(uint256 _roundId, Prediction _prediction) external payable {
+    function enterRound(uint256 _roundId, Prediction _prediction) external payable returns (Bet memory) {
 		require(rounds[_roundId].timestamp + roundTime > block.timestamp, "Round is closed");
 		require(msg.value >= minBet, "Your bet is too low");
         require(msg.value <= maxBet, "Your bet is too high");
@@ -65,9 +64,11 @@ contract HigherLower is PaymentManagement {
         rounds[_roundId].pools[poolId] += msg.value;
 
         emit EnterRound(msg.sender, msg.value, _prediction);
+
+		return Bet(msg.sender, msg.value);
     }
 
-	function calculateWinner(uint256 _roundId) external onlyOwner returns (Prediction) {
+	function calculateResult(uint256 _roundId) external onlyOwner returns (Prediction) {
 		Round memory round = rounds[_roundId];
 		require(round.timestamp + roundTime < block.timestamp, "Round is not closed");
 
@@ -80,9 +81,10 @@ contract HigherLower is PaymentManagement {
 		rounds[_roundId].result = result;
 		return result;
 	}
-	//send an array of winners depending on the result of getResult()
+
     function closeRound(uint256 _roundId, Bet[] calldata _winners) external onlyOwner {
 		Round memory round = rounds[_roundId];
+		require(round.result != Prediction.Unknown, "The round does not have a result");
 
 		if(round.result != Prediction.Equal) {
 			uint256 winningPoolId = round.result == Prediction.Higher ? 1 : 0;
