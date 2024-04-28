@@ -5,7 +5,6 @@ import { AggregatorV3Interface } from "@chainlink/contracts/src/v0.8/shared/inte
 
 import { Ownable } from "../security/Ownable.sol";
 
-//add to readme https://docs.chain.link/data-feeds/price-feeds/addresses?network=ethereum&page=1
 contract PriceFeed is Ownable {
 	mapping(string => mapping(string => address)) public feeds;
 
