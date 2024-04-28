@@ -2,11 +2,13 @@
 
 1. [Set up](#set-up)
    - [Number generator](#number-generator)
+   - [Price feed](#price-feed)
 3. [Games](#games)
    - [Duels for two](#duels-for-two)
    - [Jackpot](#jackpot)
    - [Roulette](#roulette)
    - [Color wheel](#color-wheel)
+   - [Higher lower](#higher-lower)
 
   
 # Set-up
@@ -54,6 +56,21 @@ function getRequestStatus(uint256 _requestId) requestExist(_requestId) onlyAppro
 ```
 You can check when `request` was fulfilled and its random number calling the function. 
 
+## Price feed
+### 1.1 Add price feed for pair
+```solidity
+function addPriceFeed(string[2] calldata _symbols, address _priceFeed) onlyOwner external
+```
+
+To add a new price fee, pass an array of symbols for that pair (example: [ETH, USDT]) and an address of price feed contract (you can find it on [Chain Link](https://docs.chain.link/data-feeds/price-feeds/addresses?network=ethereum&page=1) website).
+
+### 1.2 Get the latest price
+>[!IMPORTANT]
+>You must add a price feed for that pair to receive the price.
+```solidity
+function getLatestPriceFeed(string[2] calldata _symbols) public view returns (int256, uint256)
+```
+Pass an array of symbols for the existing pair. You will receive the latest `price` and `timestamp`, the price was updated.
 # Games
 > [!IMPORTANT]
 > To deploy any game you'll need to pass `ownerFee` and `numberGenerator` - the address of deployed previously `NumberGenerator.sol`.
@@ -287,4 +304,53 @@ function closeWheel(Bet[] calldata _winningBets, Color _winningColor) external o
    ...
 }
 ```
-Use the `winningColor` that was received from `calculateWinningColor` function and array of bets that were picked from the server side depending on this color, then you must provide both of these arguments to this function.
+Use the `winningColor` that was received from `calculateWinningColor` function and the array of bets that were picked from the server side depending on this color, then you must provide both of these arguments to this function.
+
+## Higher lower
+>[!NOTE]
+>One of the arguments is the `priceFeed` address of `PriceFeed.sol` that was previously deployed.
+
+>[!NOTE]
+> Prediction states for the game: Lower - 1, Equal - 2, Higher - 3.
+
+### 1.1 Create round
+```solidity
+function createRound(string[2] calldata _symbols) external onlyOwner {
+   ...
+   emit CreateRound(roundId, startPrice);
+   ...
+}
+```
+You can create a round for any pair that exists. The price will be set to the `rounds` mapping under the `roundId`.
+
+### 1.2 Enter round
+```solidity
+function enterRound(uint256 _roundId, Prediction _prediction) external payable returns (Bet memory) {
+   ...
+   emit EnterRound(msg.sender, msg.value, _prediction);
+   ...
+}
+```
+The function must be called during `roundTime`. The user must provide `_prediction` (see the states [here](#higher-lower) and the amount of ETH between `minBet` and `maxBet`. Will return the bet of a user (see the struct [here](#games))
+
+### 1.3 Calculate result
+>[!IMPORTANT]
+>Must be called before calling `closeRound`.
+```solidity
+function calculateResult(uint256 _roundId) external onlyOwner returns (Prediction)
+```
+The function must be called only during the `roundTime`. It will set the latest price and calculate the result based on price change.
+
+### 1.4 Close round
+>[!CAUTION]
+>It might be quite expensive to execute this transaction so you can set a limit for maximum players in a round.
+
+>[!IMPORTANT]
+>Must be called after calling `calculateResult`.
+```solidity
+function closeRound(uint256 _roundId, Bet[] calldata _winners) external onlyOwner {
+   ...
+   emit CloseRound(_roundId, round.prices[1], round.result);
+}
+```
+You must provide an array of `Bet` from the backend, depending on the result from `calculateResult` function. The function will pay to each user depending on their bet.
