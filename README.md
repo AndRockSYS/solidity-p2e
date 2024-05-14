@@ -1,5 +1,8 @@
 # Games on Solidity with true randomness
 
+>[!IMPORTANT]
+>All the games were made to show you the possibility of ChainLink nodes and implementing true randomness into the blockchain.
+
 1. [Set up](#set-up)
    - [Number generator](#number-generator)
    - [Price feed](#price-feed)
